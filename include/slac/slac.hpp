@@ -55,6 +55,9 @@ const uint16_t MMTYPE_CM_VALIDATE = 0x6078;
 const uint16_t MMTYPE_CM_SLAC_MATCH = 0x607C;
 const uint16_t MMTYPE_CM_ATTEN_PROFILE = 0x6084;
 
+// Vendor MME
+const uint16_t MMTYPE_CM_RESET_DEVICE = 0xA01C;
+
 const uint16_t MMTYPE_MODE_REQ = 0x0000;
 const uint16_t MMTYPE_MODE_CNF = 0x0001;
 const uint16_t MMTYPE_MODE_IND = 0x0002;
@@ -298,6 +301,15 @@ typedef struct {
     uint8_t pmn;
     uint8_t cco_capability;
 } __attribute__((packed)) cm_set_key_cnf;
+
+typedef struct {
+    uint8_t vendor_mme[3]; // Vendor MME code
+} __attribute__((packed)) cm_reset_req;
+
+typedef struct {
+    uint8_t vendor_mme[3]; // Vendor MME code
+    uint8_t success;
+} __attribute__((packed)) cm_reset_cnf;
 
 } // namespace messages
 } // namespace slac

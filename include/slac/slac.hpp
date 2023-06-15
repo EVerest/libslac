@@ -17,6 +17,7 @@ namespace defs {
 const uint16_t ETH_P_HOMEPLUG_GREENPHY = 0x88E1;
 
 const uint8_t MMV_HOMEPLUG_GREENPHY = 0x01;
+const uint8_t MMV_VENDOR_MME = 0x00;
 
 const int MME_MIN_LENGTH = 60;
 
@@ -114,19 +115,27 @@ typedef struct {
     struct {
         uint8_t mmv;     // management message version
         uint16_t mmtype; // management message type
-        uint8_t fmni;    // fragmentation management number information
-        uint8_t fmsn;    // fragmentation message sequence number
     } __attribute__((packed)) homeplug_header;
 
+    // In protocol version 1.0 payload starts here, in 1.1 it starts after the two bytes fragmentation data
+    struct {
+        uint8_t fmni; // fragmentation management number information
+        uint8_t fmsn; // fragmentation message sequence number
+    } __attribute__((packed)) homeplug_fragmentation_or_mmentry_1_0;
+
     // the rest of this message is potentially payload data
-    uint8_t mmentry[ETH_FRAME_LEN - ETH_HLEN - sizeof(homeplug_header)];
+    uint8_t mmentry[ETH_FRAME_LEN - ETH_HLEN - sizeof(homeplug_header) - sizeof(homeplug_fragmentation_or_mmentry_1_0)];
 } __attribute__((packed)) homeplug_message;
 
 class HomeplugMessage {
 public:
     HomeplugMessage() {
-        raw_msg.homeplug_header.fmni = 0; // not used
-        raw_msg.homeplug_header.fmsn = 0; // not used
+        raw_msg.homeplug_fragmentation_or_mmentry_1_0.fmni = 0; // should be zero in protocol 1
+        raw_msg.homeplug_fragmentation_or_mmentry_1_0.fmsn = 0; // should be zero in protocol 1
+    }
+
+    void set_protocol_version(int v) {
+        protocol_version = v;
     }
 
     homeplug_message& get_raw_message() {
@@ -144,7 +153,19 @@ public:
     const uint8_t* get_src_mac();
 
     template <typename T> const T& get_payload() {
-        return *reinterpret_cast<T*>(raw_msg.mmentry);
+        if (protocol_version == 1) {
+            return *reinterpret_cast<T*>(raw_msg.mmentry);
+        } else {
+            return *reinterpret_cast<T*>(&raw_msg.homeplug_fragmentation_or_mmentry_1_0.fmni);
+        }
+    }
+
+    uint8_t* get_payload_ptr() {
+        if (protocol_version == 1) {
+            return reinterpret_cast<uint8_t*>(raw_msg.mmentry);
+        } else {
+            return reinterpret_cast<uint8_t*>(&raw_msg.homeplug_fragmentation_or_mmentry_1_0.fmni);
+        }
     }
 
     bool is_valid() const;
@@ -156,6 +177,8 @@ private:
     homeplug_message raw_msg;
     int raw_msg_len{-1};
     bool keep_src_mac{false};
+    // SLAC messages use 1.1 Mac Mangement version, so we set that by default
+    int protocol_version{1};
 };
 
 const int M_SOUND_TARGET_LEN = 6;

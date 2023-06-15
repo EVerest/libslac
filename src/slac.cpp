@@ -69,22 +69,31 @@ void HomeplugMessage::setup_payload(void* payload, int len, uint16_t mmtype) {
     assert(("Homeplug Payload length too long", len < sizeof(raw_msg.mmentry)));
 
     // setup homeplug mme header
-    raw_msg.homeplug_header.mmv = defs::MMV_HOMEPLUG_GREENPHY;
-    raw_msg.homeplug_header.mmtype = htole16(mmtype);
-    raw_msg.homeplug_header.fmni = 0; // not used
-    raw_msg.homeplug_header.fmsn = 0; // not used
-
-    // copy payload
-    memcpy(raw_msg.mmentry, payload, len);
-
-    // set the message size to at least MME_MIN_LENGTH
-    int padding_len = defs::MME_MIN_LENGTH - (sizeof(raw_msg.ethernet_header) + sizeof(raw_msg.homeplug_header) + len);
-    if (padding_len > 0) {
-        memset(raw_msg.mmentry + len, 0x00, padding_len);
+    if (protocol_version == 1) {
+        raw_msg.homeplug_header.mmv = defs::MMV_HOMEPLUG_GREENPHY;
+    } else {
+        raw_msg.homeplug_header.mmv = defs::MMV_VENDOR_MME;
     }
 
-    raw_msg_len =
-        std::max(sizeof(raw_msg.ethernet_header) + sizeof(raw_msg.homeplug_header) + len, (size_t)defs::MME_MIN_LENGTH);
+    raw_msg.homeplug_header.mmtype = htole16(mmtype);
+
+    // copy payload
+    memcpy(get_payload_ptr(), payload, len);
+
+    size_t message_len = sizeof(raw_msg.ethernet_header) + sizeof(raw_msg.homeplug_header) + len;
+    // protocol version 1 uses the two fragmentation bytes extra
+    if (protocol_version == 1) {
+        message_len += sizeof(raw_msg.homeplug_fragmentation_or_mmentry_1_0);
+    }
+
+    // set the message size to at least MME_MIN_LENGTH
+    int padding_len = defs::MME_MIN_LENGTH - message_len;
+
+    if (padding_len > 0) {
+        memset(get_payload_ptr() + len, 0x00, padding_len);
+    }
+
+    raw_msg_len = std::max(message_len, (size_t)defs::MME_MIN_LENGTH);
 }
 
 void HomeplugMessage::setup_ethernet_header(const uint8_t dst_mac_addr[ETH_ALEN],

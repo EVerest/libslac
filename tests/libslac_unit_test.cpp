@@ -13,6 +13,6 @@ protected:
 };
 
 TEST_F(LibSLACUnitTest, test_invalid_datetime) {
-    ASSERT_TRUE(1==1);
+    ASSERT_TRUE(1 == 1);
 }
 } // namespace libslac

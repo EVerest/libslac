@@ -12,6 +12,8 @@ find_package(everest-cmake 0.1 REQUIRED
 # options
 option(BUILD_SLAC_TOOLS "Build SLAC tools" OFF)
 option(SLAC_INSTALL "Install the library (shared data might be installed anyway)" ${EVC_MAIN_PROJECT})
+option(${PROJECT_NAME}_BUILD_TESTING "Build unit tests, used if included as dependency" OFF)
+option(BUILD_TESTING "Build unit tests, used if standalone project" OFF)
 
 add_subdirectory(3rd_party)
 

@@ -3,8 +3,10 @@
 #ifndef SLAC_SLAC_HPP
 #define SLAC_SLAC_HPP
 
-#include <net/ethernet.h>
+#include <stdexcept>
 #include <stdint.h>
+
+#include <net/ethernet.h>
 
 namespace slac {
 
@@ -17,6 +19,7 @@ namespace defs {
 const uint16_t ETH_P_HOMEPLUG_GREENPHY = 0x88E1;
 
 const uint8_t MMV_HOMEPLUG_GREENPHY = 0x01;
+const uint8_t MMV_VENDOR_MME = 0x00;
 
 const int MME_MIN_LENGTH = 60;
 
@@ -57,6 +60,9 @@ const uint16_t MMTYPE_CM_VALIDATE = 0x6078;
 const uint16_t MMTYPE_CM_SLAC_MATCH = 0x607C;
 const uint16_t MMTYPE_CM_ATTEN_PROFILE = 0x6084;
 
+// Vendor MME
+const uint16_t MMTYPE_CM_RESET_DEVICE = 0xA01C;
+
 const uint16_t MMTYPE_MODE_REQ = 0x0000;
 const uint16_t MMTYPE_MODE_CNF = 0x0001;
 const uint16_t MMTYPE_MODE_IND = 0x0002;
@@ -82,9 +88,9 @@ const uint16_t CM_SLAC_MATCH_REQ_MVF_LENGTH = 0x3e;
 
 const uint16_t CM_SLAC_MATCH_CNF_MVF_LENGTH = 0x56;
 
-const uint8_t CM_SLAC_PARM_CNF_RESP_TYPE = 0x01;  // = other GP station
-const uint8_t CM_SLAC_PARM_CNF_NUM_SOUNDS = 10;   // typical value
-const uint8_t CM_SLAC_PARM_CNF_TIMEOUT = 0x06;    // 600ms
+const uint8_t CM_SLAC_PARM_CNF_RESP_TYPE = 0x01; // = other GP station
+const uint8_t CM_SLAC_PARM_CNF_NUM_SOUNDS = 10;  // typical value
+const uint8_t CM_SLAC_PARM_CNF_TIMEOUT = 0x06;   // 600ms
 
 const uint8_t CM_SET_KEY_REQ_KEY_TYPE_NMK = 0x01; // NMK (AES-128), Network Management Key
 const uint8_t CM_SET_KEY_REQ_PID_HLE = 0x04;
@@ -108,28 +114,34 @@ void generate_nid_from_nmk(uint8_t nid[slac::defs::NID_LEN], const uint8_t nmk[s
 
 namespace messages {
 
-typedef struct {
-    struct ether_header ethernet_header;
-    struct {
-        uint8_t mmv;     // management message version
-        uint16_t mmtype; // management message type
-        uint8_t fmni;    // fragmentation management number information
-        uint8_t fmsn;    // fragmentation message sequence number
-    } __attribute__((packed)) homeplug_header;
-
-    // the rest of this message is potentially payload data
-    uint8_t mmentry[ETH_FRAME_LEN - ETH_HLEN - sizeof(homeplug_header)];
-} __attribute__((packed)) homeplug_message;
-
 class HomeplugMessage {
 public:
     HomeplugMessage() {
-        raw_msg.homeplug_header.fmni = 0; // not used
-        raw_msg.homeplug_header.fmsn = 0; // not used
+        raw_msg.v_1_1.homeplug_header.fmni = 0; // not used
+        raw_msg.v_1_1.homeplug_header.fmsn = 0; // not used
     }
 
-    homeplug_message& get_raw_message() {
-        return raw_msg;
+    void set_protocol_version(int _version) {
+        protocol_version = _version;
+    }
+
+    // After a raw messasge was read, update the internal protocol version number from the received data in rawmsg
+    void set_protocol_version_from_rawmsg() {
+        // Note that mmv is the same on both version, so it does not matter which member of the union we use here
+        if (raw_msg.v_1_1.homeplug_header.mmv == slac::defs::MMV_VENDOR_MME) {
+            protocol_version = 0;
+        } else {
+            protocol_version = 1;
+        }
+    }
+
+    uint8_t* get_raw_message_ptr() {
+        if (protocol_version == 1) {
+            return reinterpret_cast<uint8_t*>(&raw_msg.v_1_1);
+        } else if (protocol_version == 0) {
+            return reinterpret_cast<uint8_t*>(&raw_msg.v_1_0);
+        }
+        throw std::out_of_range("Unsupported protocol version");
     };
 
     int get_raw_msg_len() const {
@@ -140,10 +152,15 @@ public:
     void setup_ethernet_header(const uint8_t dst_mac_addr[ETH_ALEN], const uint8_t src_mac_addr[ETH_ALEN] = nullptr);
 
     uint16_t get_mmtype();
-    const uint8_t* get_src_mac();
+    uint8_t* get_src_mac();
 
     template <typename T> const T& get_payload() {
-        return *reinterpret_cast<T*>(raw_msg.mmentry);
+        if (protocol_version == 1) {
+            return *reinterpret_cast<T*>(raw_msg.v_1_1.mmentry);
+        } else if (protocol_version == 0) {
+            return *reinterpret_cast<T*>(raw_msg.v_1_0.mmentry);
+        }
+        throw std::out_of_range("Unsupported protocol version");
     }
 
     bool is_valid() const;
@@ -152,7 +169,37 @@ public:
     }
 
 private:
-    homeplug_message raw_msg;
+    typedef struct {
+        struct ether_header ethernet_header;
+        struct {
+            uint8_t mmv;     // management message version
+            uint16_t mmtype; // management message type
+            uint8_t fmni;    // fragmentation management number information
+            uint8_t fmsn;    // fragmentation message sequence number
+        } __attribute__((packed)) homeplug_header;
+
+        // the rest of this message is potentially payload data
+        uint8_t mmentry[ETH_FRAME_LEN - ETH_HLEN - sizeof(homeplug_header)];
+    } __attribute__((packed)) homeplug_message_v1_1;
+
+    typedef struct {
+        struct ether_header ethernet_header;
+        struct {
+            uint8_t mmv;     // management message version
+            uint16_t mmtype; // management message type
+        } __attribute__((packed)) homeplug_header;
+
+        // the rest of this message is potentially payload data
+        uint8_t mmentry[ETH_FRAME_LEN - ETH_HLEN - sizeof(homeplug_header)];
+    } __attribute__((packed)) homeplug_message_v1_0;
+
+    union {
+        homeplug_message_v1_0 v_1_0;
+        homeplug_message_v1_1 v_1_1;
+    } raw_msg;
+
+    int protocol_version{1};
+
     int raw_msg_len{-1};
     bool keep_src_mac{false};
 };
@@ -194,13 +241,13 @@ typedef struct {
 } __attribute__((packed)) cm_start_atten_char_ind;
 
 typedef struct {
-    uint8_t application_type;            // fixed to 0x00, indicating 'pev-evse matching'
-    uint8_t security_type;               // fixed to 0x00, indicating 'no security'
-    uint8_t source_address[ETH_ALEN];    // mac address of EV host, which initiates matching
-    uint8_t run_id[defs::RUN_ID_LEN];    // indentifier for a matching run
-    uint8_t source_id[SOURCE_ID_LEN];    // unique id of the station, that sent the m-sounds
-    uint8_t resp_id[RESP_ID_LEN];        // unique id of the station, that is sending this message
-    uint8_t num_sounds;                  // number of sounds used for attenuation profile
+    uint8_t application_type;         // fixed to 0x00, indicating 'pev-evse matching'
+    uint8_t security_type;            // fixed to 0x00, indicating 'no security'
+    uint8_t source_address[ETH_ALEN]; // mac address of EV host, which initiates matching
+    uint8_t run_id[defs::RUN_ID_LEN]; // indentifier for a matching run
+    uint8_t source_id[SOURCE_ID_LEN]; // unique id of the station, that sent the m-sounds
+    uint8_t resp_id[RESP_ID_LEN];     // unique id of the station, that is sending this message
+    uint8_t num_sounds;               // number of sounds used for attenuation profile
     struct {
         uint8_t num_groups;              // number of OFDM carrier groups
         uint8_t aag[defs::AAG_LIST_LEN]; // AAG_1 .. AAG_N
@@ -229,8 +276,8 @@ typedef struct {
 
 // note: this message doesn't seem to part of hpgp, it is defined in ISO15118-3
 typedef struct {
-    uint8_t pev_mac[ETH_ALEN];       // mac address of the EV host
-    uint8_t num_groups;              // number of OFDM carrier groups
+    uint8_t pev_mac[ETH_ALEN]; // mac address of the EV host
+    uint8_t num_groups;        // number of OFDM carrier groups
     uint8_t _reserved;
     uint8_t aag[defs::AAG_LIST_LEN]; // list of average attenuation for each group
 } __attribute__((packed)) cm_atten_profile_ind;
@@ -300,6 +347,15 @@ typedef struct {
     uint8_t pmn;
     uint8_t cco_capability;
 } __attribute__((packed)) cm_set_key_cnf;
+
+typedef struct {
+    uint8_t vendor_mme[3] = {0x00, 0xb0, 0x52}; // Vendor MME code
+} __attribute__((packed)) cm_reset_device_req;
+
+typedef struct {
+    uint8_t vendor_mme[3]; // Vendor MME code
+    uint8_t success;
+} __attribute__((packed)) cm_reset_device_cnf;
 
 } // namespace messages
 } // namespace slac

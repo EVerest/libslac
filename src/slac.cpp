@@ -66,37 +66,70 @@ void generate_nid_from_nmk(uint8_t nid[slac::defs::NID_LEN], const uint8_t nmk[s
 
 namespace messages {
 void HomeplugMessage::setup_payload(void* payload, int len, uint16_t mmtype) {
-    assert(("Homeplug Payload length too long", len < sizeof(raw_msg.mmentry)));
+    if (protocol_version == 1) {
+        assert(("Homeplug Payload length too long", len < sizeof(raw_msg.v_1_1.mmentry)));
 
-    // setup homeplug mme header
-    raw_msg.homeplug_header.mmv = defs::MMV_HOMEPLUG_GREENPHY;
-    raw_msg.homeplug_header.mmtype = htole16(mmtype);
-    raw_msg.homeplug_header.fmni = 0; // not used
-    raw_msg.homeplug_header.fmsn = 0; // not used
+        // setup homeplug mme header
+        raw_msg.v_1_1.homeplug_header.mmv = defs::MMV_HOMEPLUG_GREENPHY;
+        raw_msg.v_1_1.homeplug_header.mmtype = htole16(mmtype);
+        raw_msg.v_1_1.homeplug_header.fmni = 0; // not used
+        raw_msg.v_1_1.homeplug_header.fmsn = 0; // not used
 
-    // copy payload
-    memcpy(raw_msg.mmentry, payload, len);
+        // copy payload
+        memcpy(raw_msg.v_1_1.mmentry, payload, len);
 
-    // set the message size to at least MME_MIN_LENGTH
-    int padding_len = defs::MME_MIN_LENGTH - (sizeof(raw_msg.ethernet_header) + sizeof(raw_msg.homeplug_header) + len);
-    if (padding_len > 0) {
-        memset(raw_msg.mmentry + len, 0x00, padding_len);
+        // set the message size to at least MME_MIN_LENGTH
+        int padding_len = defs::MME_MIN_LENGTH -
+                          (sizeof(raw_msg.v_1_1.ethernet_header) + sizeof(raw_msg.v_1_1.homeplug_header) + len);
+        if (padding_len > 0) {
+            memset(raw_msg.v_1_1.mmentry + len, 0x00, padding_len);
+        }
+
+        raw_msg_len = std::max(sizeof(raw_msg.v_1_1.ethernet_header) + sizeof(raw_msg.v_1_1.homeplug_header) + len,
+                               (size_t)defs::MME_MIN_LENGTH);
+    } else if (protocol_version == 0) {
+        assert(("Homeplug Payload length too long", len < sizeof(raw_msg.v_1_0.mmentry)));
+
+        // setup homeplug mme header
+        raw_msg.v_1_0.homeplug_header.mmv = defs::MMV_VENDOR_MME;
+        raw_msg.v_1_0.homeplug_header.mmtype = htole16(mmtype);
+
+        // copy payload
+        memcpy(raw_msg.v_1_0.mmentry, payload, len);
+
+        // set the message size to at least MME_MIN_LENGTH
+        int padding_len = defs::MME_MIN_LENGTH -
+                          (sizeof(raw_msg.v_1_0.ethernet_header) + sizeof(raw_msg.v_1_0.homeplug_header) + len);
+        if (padding_len > 0) {
+            memset(raw_msg.v_1_0.mmentry + len, 0x00, padding_len);
+        }
+
+        raw_msg_len = std::max(sizeof(raw_msg.v_1_0.ethernet_header) + sizeof(raw_msg.v_1_0.homeplug_header) + len,
+                               (size_t)defs::MME_MIN_LENGTH);
+    } else {
+        throw std::out_of_range("Unsupported protocol version");
     }
-
-    raw_msg_len =
-        std::max(sizeof(raw_msg.ethernet_header) + sizeof(raw_msg.homeplug_header) + len, (size_t)defs::MME_MIN_LENGTH);
 }
 
 void HomeplugMessage::setup_ethernet_header(const uint8_t dst_mac_addr[ETH_ALEN],
                                             const uint8_t src_mac_addr[ETH_ALEN]) {
+
+    struct ether_header* ethernet_header = NULL;
+    if (protocol_version == 1) {
+        ethernet_header = &raw_msg.v_1_1.ethernet_header;
+    } else if (protocol_version == 0) {
+        ethernet_header = &raw_msg.v_1_0.ethernet_header;
+    } else {
+        throw std::out_of_range("Unsupported protocol version");
+    }
     // ethernet frame byte order is big endian
-    raw_msg.ethernet_header.ether_type = htons(defs::ETH_P_HOMEPLUG_GREENPHY);
+    ethernet_header->ether_type = htons(defs::ETH_P_HOMEPLUG_GREENPHY);
     if (dst_mac_addr) {
-        memcpy(raw_msg.ethernet_header.ether_dhost, dst_mac_addr, ETH_ALEN);
+        memcpy(ethernet_header->ether_dhost, dst_mac_addr, ETH_ALEN);
     }
 
     if (src_mac_addr) {
-        memcpy(raw_msg.ethernet_header.ether_shost, src_mac_addr, ETH_ALEN);
+        memcpy(ethernet_header->ether_shost, src_mac_addr, ETH_ALEN);
         keep_src_mac = true;
     } else {
         keep_src_mac = false;
@@ -104,11 +137,23 @@ void HomeplugMessage::setup_ethernet_header(const uint8_t dst_mac_addr[ETH_ALEN]
 }
 
 uint16_t HomeplugMessage::get_mmtype() {
-    return le16toh(raw_msg.homeplug_header.mmtype);
+    if (protocol_version == 1) {
+        return le16toh(raw_msg.v_1_1.homeplug_header.mmtype);
+    } else if (protocol_version == 0) {
+        return le16toh(raw_msg.v_1_0.homeplug_header.mmtype);
+    } else {
+        throw std::out_of_range("Unsupported protocol version");
+    }
 }
 
-const uint8_t* HomeplugMessage::get_src_mac() {
-    return raw_msg.ethernet_header.ether_shost;
+uint8_t* HomeplugMessage::get_src_mac() {
+    if (protocol_version == 1) {
+        return raw_msg.v_1_1.ethernet_header.ether_shost;
+    } else if (protocol_version == 0) {
+        return raw_msg.v_1_0.ethernet_header.ether_shost;
+    } else {
+        throw std::out_of_range("Unsupported protocol version");
+    }
 }
 
 bool HomeplugMessage::is_valid() const {

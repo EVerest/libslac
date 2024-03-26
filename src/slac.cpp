@@ -83,7 +83,7 @@ void HomeplugMessage::setup_payload(void const* payload, int len, uint16_t mmtyp
     uint8_t* dst = raw_msg.payload;
 
     if (mmv != defs::MMV::AV_1_0) {
-        homeplug_fragmentation_part fragmentation_part {};
+        homeplug_fragmentation_part fragmentation_part{};
         fragmentation_part.fmni = 0; // not implemented
         fragmentation_part.fmsn = 0; // not implemented
         memcpy(dst, &fragmentation_part, sizeof(fragmentation_part));

@@ -65,12 +65,12 @@ void generate_nid_from_nmk(uint8_t nid[slac::defs::NID_LEN], const uint8_t nmk[s
 } // namespace utils
 
 namespace messages {
-void HomeplugMessage::setup_payload(void* payload, int len, uint16_t mmtype) {
+void HomeplugMessage::setup_payload(void const* payload, int len, uint16_t mmtype) {
     if (protocol_version == 1) {
         assert(("Homeplug Payload length too long", len < sizeof(raw_msg.v_1_1.mmentry)));
 
         // setup homeplug mme header
-        raw_msg.v_1_1.homeplug_header.mmv = defs::MMV_HOMEPLUG_GREENPHY;
+        raw_msg.v_1_1.homeplug_header.mmv = static_cast<std::underlying_type_t<defs::MMV>>(defs::MMV::AV_1_1);
         raw_msg.v_1_1.homeplug_header.mmtype = htole16(mmtype);
         raw_msg.v_1_1.homeplug_header.fmni = 0; // not used
         raw_msg.v_1_1.homeplug_header.fmsn = 0; // not used
@@ -91,7 +91,7 @@ void HomeplugMessage::setup_payload(void* payload, int len, uint16_t mmtype) {
         assert(("Homeplug Payload length too long", len < sizeof(raw_msg.v_1_0.mmentry)));
 
         // setup homeplug mme header
-        raw_msg.v_1_0.homeplug_header.mmv = defs::MMV_VENDOR_MME;
+        raw_msg.v_1_0.homeplug_header.mmv = static_cast<std::underlying_type_t<defs::MMV>>(defs::MMV::AV_1_0);;
         raw_msg.v_1_0.homeplug_header.mmtype = htole16(mmtype);
 
         // copy payload

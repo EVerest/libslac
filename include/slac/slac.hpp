@@ -18,8 +18,11 @@ namespace defs {
 
 const uint16_t ETH_P_HOMEPLUG_GREENPHY = 0x88E1;
 
-const uint8_t MMV_HOMEPLUG_GREENPHY = 0x01;
-const uint8_t MMV_VENDOR_MME = 0x00;
+enum class MMV : uint8_t {
+    AV_1_0 = 0x0,
+    AV_1_1 = 0x1,
+    AV_2_0 = 0x2,
+};
 
 const int MME_MIN_LENGTH = 60;
 
@@ -94,9 +97,9 @@ const uint16_t CM_SLAC_MATCH_REQ_MVF_LENGTH = 0x3e;
 
 const uint16_t CM_SLAC_MATCH_CNF_MVF_LENGTH = 0x56;
 
-const uint8_t CM_SLAC_PARM_CNF_RESP_TYPE = 0x01;  // = other GP station
-const uint8_t CM_SLAC_PARM_CNF_NUM_SOUNDS = 10;   // typical value
-const uint8_t CM_SLAC_PARM_CNF_TIMEOUT = 0x06;    // 600ms
+const uint8_t CM_SLAC_PARM_CNF_RESP_TYPE = 0x01; // = other GP station
+const uint8_t CM_SLAC_PARM_CNF_NUM_SOUNDS = 10;  // typical value
+const uint8_t CM_SLAC_PARM_CNF_TIMEOUT = 0x06;   // 600ms
 
 const uint8_t CM_SET_KEY_REQ_KEY_TYPE_NMK = 0x01; // NMK (AES-128), Network Management Key
 const uint8_t CM_SET_KEY_REQ_PID_HLE = 0x04;
@@ -134,7 +137,7 @@ public:
     // After a raw messasge was read, update the internal protocol version number from the received data in rawmsg
     void set_protocol_version_from_rawmsg() {
         // Note that mmv is the same on both version, so it does not matter which member of the union we use here
-        if (raw_msg.v_1_1.homeplug_header.mmv == slac::defs::MMV_VENDOR_MME) {
+        if (raw_msg.v_1_1.homeplug_header.mmv == static_cast<std::underlying_type_t<defs::MMV>>(defs::MMV::AV_1_0)) {
             protocol_version = 0;
         } else {
             protocol_version = 1;
@@ -154,7 +157,7 @@ public:
         return raw_msg_len;
     }
 
-    void setup_payload(void* payload, int len, uint16_t mmtype);
+    void setup_payload(void const* payload, int len, uint16_t mmtype);
     void setup_ethernet_header(const uint8_t dst_mac_addr[ETH_ALEN], const uint8_t src_mac_addr[ETH_ALEN] = nullptr);
 
     uint16_t get_mmtype();
@@ -247,13 +250,13 @@ typedef struct {
 } __attribute__((packed)) cm_start_atten_char_ind;
 
 typedef struct {
-    uint8_t application_type;            // fixed to 0x00, indicating 'pev-evse matching'
-    uint8_t security_type;               // fixed to 0x00, indicating 'no security'
-    uint8_t source_address[ETH_ALEN];    // mac address of EV host, which initiates matching
-    uint8_t run_id[defs::RUN_ID_LEN];    // indentifier for a matching run
-    uint8_t source_id[SOURCE_ID_LEN];    // unique id of the station, that sent the m-sounds
-    uint8_t resp_id[RESP_ID_LEN];        // unique id of the station, that is sending this message
-    uint8_t num_sounds;                  // number of sounds used for attenuation profile
+    uint8_t application_type;         // fixed to 0x00, indicating 'pev-evse matching'
+    uint8_t security_type;            // fixed to 0x00, indicating 'no security'
+    uint8_t source_address[ETH_ALEN]; // mac address of EV host, which initiates matching
+    uint8_t run_id[defs::RUN_ID_LEN]; // indentifier for a matching run
+    uint8_t source_id[SOURCE_ID_LEN]; // unique id of the station, that sent the m-sounds
+    uint8_t resp_id[RESP_ID_LEN];     // unique id of the station, that is sending this message
+    uint8_t num_sounds;               // number of sounds used for attenuation profile
     struct {
         uint8_t num_groups;              // number of OFDM carrier groups
         uint8_t aag[defs::AAG_LIST_LEN]; // AAG_1 .. AAG_N
@@ -282,8 +285,8 @@ typedef struct {
 
 // note: this message doesn't seem to part of hpgp, it is defined in ISO15118-3
 typedef struct {
-    uint8_t pev_mac[ETH_ALEN];       // mac address of the EV host
-    uint8_t num_groups;              // number of OFDM carrier groups
+    uint8_t pev_mac[ETH_ALEN]; // mac address of the EV host
+    uint8_t num_groups;        // number of OFDM carrier groups
     uint8_t _reserved;
     uint8_t aag[defs::AAG_LIST_LEN]; // list of average attenuation for each group
 } __attribute__((packed)) cm_atten_profile_ind;

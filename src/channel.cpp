@@ -38,7 +38,7 @@ bool Channel::read(slac::messages::HomeplugMessage& msg, int timeout) {
     did_timeout = false;
     using IOResult = ::utils::PacketSocket::IOResult;
     if (socket) {
-        switch (socket->read(msg.get_raw_message_ptr(), timeout)) {
+        switch (socket->read(reinterpret_cast<uint8_t*>(msg.get_raw_message_ptr()), timeout)) {
         // FIXME (aw): this enum conversion looks ugly
         case IOResult::Failure:
             error = socket->get_error();

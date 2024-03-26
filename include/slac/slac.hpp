@@ -3,8 +3,8 @@
 #ifndef SLAC_SLAC_HPP
 #define SLAC_SLAC_HPP
 
-#include <stdexcept>
-#include <stdint.h>
+#include <cstdint>
+#include <utility>
 
 #include <net/ethernet.h>
 
@@ -123,53 +123,46 @@ void generate_nid_from_nmk(uint8_t nid[slac::defs::NID_LEN], const uint8_t nmk[s
 
 namespace messages {
 
+typedef struct {
+    struct ether_header ethernet_header;
+    struct {
+        uint8_t mmv;     // management message version
+        uint16_t mmtype; // management message type
+
+    } __attribute__((packed)) homeplug_header;
+
+    // the rest of this message is potentially payload data
+    uint8_t payload[ETH_FRAME_LEN - ETH_HLEN - sizeof(homeplug_header)];
+} __attribute__((packed)) homeplug_message;
+
+typedef struct {
+    uint8_t fmni; // fragmentation management number information
+    uint8_t fmsn; // fragmentation message sequence number
+} __attribute__((packed)) homeplug_fragmentation_part;
+
 class HomeplugMessage {
 public:
-    HomeplugMessage() {
-        raw_msg.v_1_1.homeplug_header.fmni = 0; // not used
-        raw_msg.v_1_1.homeplug_header.fmsn = 0; // not used
-    }
-
-    void set_protocol_version(int _version) {
-        protocol_version = _version;
-    }
-
-    // After a raw messasge was read, update the internal protocol version number from the received data in rawmsg
-    void set_protocol_version_from_rawmsg() {
-        // Note that mmv is the same on both version, so it does not matter which member of the union we use here
-        if (raw_msg.v_1_1.homeplug_header.mmv == static_cast<std::underlying_type_t<defs::MMV>>(defs::MMV::AV_1_0)) {
-            protocol_version = 0;
-        } else {
-            protocol_version = 1;
-        }
-    }
-
-    uint8_t* get_raw_message_ptr() {
-        if (protocol_version == 1) {
-            return reinterpret_cast<uint8_t*>(&raw_msg.v_1_1);
-        } else if (protocol_version == 0) {
-            return reinterpret_cast<uint8_t*>(&raw_msg.v_1_0);
-        }
-        throw std::out_of_range("Unsupported protocol version");
+    homeplug_message* get_raw_message_ptr() {
+        return &raw_msg;
     };
 
     int get_raw_msg_len() const {
         return raw_msg_len;
     }
 
-    void setup_payload(void const* payload, int len, uint16_t mmtype);
+    void setup_payload(void const* payload, int len, uint16_t mmtype, const defs::MMV mmv);
     void setup_ethernet_header(const uint8_t dst_mac_addr[ETH_ALEN], const uint8_t src_mac_addr[ETH_ALEN] = nullptr);
 
-    uint16_t get_mmtype();
+    uint16_t get_mmtype() const;
     uint8_t* get_src_mac();
 
     template <typename T> const T& get_payload() {
-        if (protocol_version == 1) {
-            return *reinterpret_cast<T*>(raw_msg.v_1_1.mmentry);
-        } else if (protocol_version == 0) {
-            return *reinterpret_cast<T*>(raw_msg.v_1_0.mmentry);
+        if (raw_msg.homeplug_header.mmv == static_cast<std::underlying_type_t<defs::MMV>>(defs::MMV::AV_1_0)) {
+            return *reinterpret_cast<T*>(raw_msg.payload);
         }
-        throw std::out_of_range("Unsupported protocol version");
+
+        // if not av 1.0 message, we need to shift by the fragmentation part
+        return *reinterpret_cast<T*>(raw_msg.payload + sizeof(homeplug_fragmentation_part));
     }
 
     bool is_valid() const;
@@ -178,36 +171,7 @@ public:
     }
 
 private:
-    typedef struct {
-        struct ether_header ethernet_header;
-        struct {
-            uint8_t mmv;     // management message version
-            uint16_t mmtype; // management message type
-            uint8_t fmni;    // fragmentation management number information
-            uint8_t fmsn;    // fragmentation message sequence number
-        } __attribute__((packed)) homeplug_header;
-
-        // the rest of this message is potentially payload data
-        uint8_t mmentry[ETH_FRAME_LEN - ETH_HLEN - sizeof(homeplug_header)];
-    } __attribute__((packed)) homeplug_message_v1_1;
-
-    typedef struct {
-        struct ether_header ethernet_header;
-        struct {
-            uint8_t mmv;     // management message version
-            uint16_t mmtype; // management message type
-        } __attribute__((packed)) homeplug_header;
-
-        // the rest of this message is potentially payload data
-        uint8_t mmentry[ETH_FRAME_LEN - ETH_HLEN - sizeof(homeplug_header)];
-    } __attribute__((packed)) homeplug_message_v1_0;
-
-    union {
-        homeplug_message_v1_0 v_1_0;
-        homeplug_message_v1_1 v_1_1;
-    } raw_msg;
-
-    int protocol_version{1};
+    homeplug_message raw_msg;
 
     int raw_msg_len{-1};
     bool keep_src_mac{false};

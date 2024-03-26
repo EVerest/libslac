@@ -60,8 +60,14 @@ const uint16_t MMTYPE_CM_VALIDATE = 0x6078;
 const uint16_t MMTYPE_CM_SLAC_MATCH = 0x607C;
 const uint16_t MMTYPE_CM_ATTEN_PROFILE = 0x6084;
 
-// Vendor MME
+// Qualcomm Vendor MMEs
 const uint16_t MMTYPE_CM_RESET_DEVICE = 0xA01C;
+const uint16_t MMTYPE_LINK_STATUS = 0xA0B8;
+const uint16_t MMTYPE_OP_ATTR = 0xA068;
+const uint16_t MMTYPE_NW_INFO = 0xA038;
+const uint16_t MMTYPE_GET_SW = 0xA000;
+
+// Standard mmtypes
 
 const uint16_t MMTYPE_MODE_REQ = 0x0000;
 const uint16_t MMTYPE_MODE_CNF = 0x0001;
@@ -349,13 +355,23 @@ typedef struct {
 } __attribute__((packed)) cm_set_key_cnf;
 
 typedef struct {
-    uint8_t vendor_mme[3] = {0x00, 0xb0, 0x52}; // Vendor MME code
+    uint8_t vendor_mme[3] = {0x00, 0xb0, 0x52}; // Qualcomm Vendor MME code
 } __attribute__((packed)) cm_reset_device_req;
 
 typedef struct {
     uint8_t vendor_mme[3]; // Vendor MME code
     uint8_t success;
 } __attribute__((packed)) cm_reset_device_cnf;
+
+typedef struct {
+    uint8_t vendor_mme[3] = {0x00, 0xb0, 0x52}; // Qualcomm Vendor MME code
+} __attribute__((packed)) link_status_req;
+
+typedef struct {
+    uint8_t vendor_mme[3]; // Vendor MME code
+    uint8_t reserved;
+    uint8_t link_status;
+} __attribute__((packed)) link_status_cnf;
 
 } // namespace messages
 } // namespace slac

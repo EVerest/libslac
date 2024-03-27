@@ -321,6 +321,8 @@ typedef struct {
     uint8_t cco_capability;
 } __attribute__((packed)) cm_set_key_cnf;
 
+namespace qualcomm {
+
 typedef struct {
     uint8_t vendor_mme[3] = {0x00, 0xb0, 0x52}; // Qualcomm Vendor MME code
 } __attribute__((packed)) cm_reset_device_req;
@@ -367,6 +369,8 @@ typedef struct {
     uint32_t sdram_size;
     uint8_t authorization_mode;
 } __attribute__((packed)) op_attr_cnf;
+
+} // namespace qualcomm
 
 } // namespace messages
 } // namespace slac

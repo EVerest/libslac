@@ -64,14 +64,22 @@ const uint16_t MMTYPE_CM_SLAC_MATCH = 0x607C;
 const uint16_t MMTYPE_CM_ATTEN_PROFILE = 0x6084;
 
 // Qualcomm Vendor MMEs
+namespace qualcomm {
 const uint16_t MMTYPE_CM_RESET_DEVICE = 0xA01C;
 const uint16_t MMTYPE_LINK_STATUS = 0xA0B8;
 const uint16_t MMTYPE_OP_ATTR = 0xA068;
 const uint16_t MMTYPE_NW_INFO = 0xA038;
 const uint16_t MMTYPE_GET_SW = 0xA000;
+} // namespace qualcomm
+
+// Lumissil Vendor MMEs
+namespace lumissil {
+const uint16_t MMTYPE_NSCM_RESET_DEVICE = 0xAC70;
+const uint16_t MMTYPE_NSCM_GET_VERSION = 0xAC6C;
+const uint16_t MMTYPE_NSCM_GET_D_LINK_STATUS = 0xAC9C;
+} // namespace lumissil
 
 // Standard mmtypes
-
 const uint16_t MMTYPE_MODE_REQ = 0x0000;
 const uint16_t MMTYPE_MODE_CNF = 0x0001;
 const uint16_t MMTYPE_MODE_IND = 0x0002;
@@ -371,6 +379,51 @@ typedef struct {
 } __attribute__((packed)) op_attr_cnf;
 
 } // namespace qualcomm
+
+namespace lumissil {
+
+typedef struct {
+    uint16_t version;
+    uint32_t reserved;
+    uint8_t request_id;
+    uint8_t reserved2[12];
+} __attribute__((packed)) lms_header;
+
+typedef struct {
+    uint8_t vendor_mme[3] = {0x00, 0x16, 0xE8}; // Lumissil Vendor MME code
+    lms_header lms;
+    uint8_t mode{0}; // Normal reset
+} __attribute__((packed)) nscm_reset_device_req;
+
+typedef struct {
+    uint8_t vendor_mme[3] = {0x00, 0x16, 0xE8}; // Lumissil Vendor MME code
+    lms_header lms;
+} __attribute__((packed)) nscm_get_version_req;
+
+typedef struct {
+    uint8_t vendor_mme[3] = {0x00, 0x16, 0xE8}; // Lumissil Vendor MME code
+    lms_header lms;
+    uint16_t version_major;
+    uint16_t version_minor;
+    uint16_t version_patch;
+    uint16_t version_build;
+    uint16_t reserved;
+} __attribute__((packed)) nscm_get_version_cnf;
+
+typedef struct {
+    uint8_t vendor_mme[3] = {0x00, 0x16, 0xE8}; // Lumissil Vendor MME code
+    lms_header lms;
+} __attribute__((packed)) nscm_get_d_link_status_req;
+
+typedef struct {
+    uint8_t vendor_mme[3] = {0x00, 0x16, 0xE8}; // Lumissil Vendor MME code
+    lms_header lms;
+    uint8_t link_status;
+} __attribute__((packed)) nscm_get_d_link_status_cnf;
+
+// There is no CNF for this reset packet
+
+} // namespace lumissil
 
 } // namespace messages
 } // namespace slac

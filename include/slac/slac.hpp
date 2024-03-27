@@ -340,6 +340,34 @@ typedef struct {
     uint8_t link_status;
 } __attribute__((packed)) link_status_cnf;
 
+typedef struct {
+    uint8_t vendor_mme[3] = {0x00, 0xb0, 0x52}; // Qualcomm Vendor MME code
+    uint32_t cookie{0x12345};                   // some cookie we will also get in the reply
+    uint8_t report_type{0};                     // binary report
+} __attribute__((packed)) op_attr_req;
+
+typedef struct {
+    uint8_t vendor_mme[3]; // Vendor MME code
+    uint16_t success;      // 0x00 means success
+    uint32_t cookie;
+    uint8_t report_type; // should be 0x00 (binary)
+    uint16_t size;       // should be 118, otherwise we do not know the structure
+    uint8_t hw_platform[16];
+    uint8_t sw_platform[16];
+    uint32_t version_major;
+    uint32_t version_minor;
+    uint32_t version_pib;
+    uint32_t version_build;
+    uint32_t reserved;
+    uint8_t build_date[8];
+    uint8_t release_type[12];
+    uint8_t sdram_type;
+    uint8_t reserved2;
+    uint8_t line_freq_zc;
+    uint32_t sdram_size;
+    uint8_t authorization_mode;
+} __attribute__((packed)) op_attr_cnf;
+
 } // namespace messages
 } // namespace slac
 

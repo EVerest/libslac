@@ -58,8 +58,9 @@ void generate_nid_from_nmk(uint8_t nid[slac::defs::NID_LEN], const uint8_t nmk[s
     // use leftmost 52 bits of the hash output
     // left most bit should be bit 7 of the nid
     memcpy(nid, hash, slac::defs::NID_LEN - 1); // (bits 52 - 5)
-    nid[slac::defs::NID_LEN - 1] = slac::defs::NID_SECURITY_LEVEL_SIMPLE_CONNECT |
-                                   (((uint8_t)hash[6]) >> slac::defs::NID_MOST_SIGNIFANT_BYTE_SHIFT);
+    nid[slac::defs::NID_LEN - 1] =
+        (slac::defs::NID_SECURITY_LEVEL_SIMPLE_CONNECT << slac::defs::NID_SECURITY_LEVEL_OFFSET) |
+        ((static_cast<uint8_t>(hash[6])) >> slac::defs::NID_MOST_SIGNIFANT_BYTE_SHIFT);
 }
 
 } // namespace utils

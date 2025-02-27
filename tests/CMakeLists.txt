@@ -14,6 +14,7 @@ endif()
 
 target_link_libraries(${PROJECT_NAME}_unit_test PRIVATE
         ${GTEST_LIBRARIES}
+        slac::slac
 )
 
 add_test(${PROJECT_NAME}_unit_test ${PROJECT_NAME}_unit_test)

@@ -15,6 +15,12 @@ option(SLAC_INSTALL "Install the library (shared data might be installed anyway)
 option(${PROJECT_NAME}_BUILD_TESTING "Build unit tests, used if included as dependency" OFF)
 option(BUILD_TESTING "Build unit tests, used if standalone project" OFF)
 
+if((${CMAKE_PROJECT_NAME} STREQUAL ${PROJECT_NAME} OR ${PROJECT_NAME}_BUILD_TESTING) AND BUILD_TESTING)
+    set(LIBSLAC_BUILD_TESTING ON)
+    include(CTest)
+    add_subdirectory(tests)
+endif()
+
 if(NOT DISABLE_EDM)
     evc_setup_edm()
 endif()
@@ -59,10 +65,4 @@ if (SLAC_INSTALL)
         NAMESPACE slac
         EXPORT slac-targets
     )
-endif()
-
-if((${CMAKE_PROJECT_NAME} STREQUAL ${PROJECT_NAME} OR ${PROJECT_NAME}_BUILD_TESTING) AND BUILD_TESTING)
-    set(LIBSLAC_BUILD_TESTING ON)
-    include(CTest)
-    add_subdirectory(tests)
 endif()
